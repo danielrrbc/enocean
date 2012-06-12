@@ -1,6 +1,7 @@
 import esp3
 import  Queue,  sqlite3
-from event import startEventHandler, ButtonEvent
+from event import startEventHandler, ButtonEvent, Event
+from action import Action
 
 def logRadio(pkt):
     userData = pkt.data[1:len(pkt.data) - 5]
@@ -16,12 +17,51 @@ def logRadio(pkt):
 
     conn.commit()
 
+def mapEvent(e):
+    result = ()
+    if isinstance(e, ButtonEvent):
+        cond = ""
+        if e.id == Event.BUTTON_PRESSED_EVENT:
+            # search for mappings with button number
+            cond = "AND SensorButton = {0:d}".format(e.button)
+
+        sql = """\
+        SELECT ActionId, ActuatorId, EnOceanId, ActionButton
+        FROM xEventAction
+            WHERE
+                SensorId = {0:d}
+            AND
+                EventTypId = {1:d}
+            {2:s};
+            """.format(e.sensor, e.id, cond)
+
+
+        for row in conn.execute(sql):
+            result += (Action(row[0], row[1], row[2], row[3]), )
+
+    return result
+
+def runAction(a):
+    if a.isSendRadioMessage():
+        # send radio message
+        pass
+
+    if a.id == Action.ON_ACTION:
+        new_state = '1'
+    elif a.id == Action.TOGGLE_ACTION:
+        new_state = 'not State'
+    else:
+        new_state = '0'
+
+    cur.execute("UPDATE Actuators SET 'State' = {0:s};".format(new_state))
+    conn.commit()
 
 # Initialize communication
 esp3.connect('COM15')
 
 # connect to database
-conn = sqlite3.connect('C:/Users/raimondi/Documents/10_Alex/EnOcean/Database')
+conn = sqlite3.connect('C:/Users/raimondi/Dropbox/Projekte/EnOcean/Database')
+
 cur = conn.cursor()
 
 # Create queues for reader
@@ -62,8 +102,9 @@ base.append(0x80)
 while running:
     # get next event
     e = qEvent.get()
-    if isinstance(e, ButtonEvent):
 
-    print e
+    for a in mapEvent(e):
+        runAction(a)
+
 
 esp3.disconnect()

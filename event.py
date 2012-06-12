@@ -41,8 +41,7 @@ def eventHandler(inQueue, outQueue):
         # get radio packets
         pkt = inQueue.get()
         # transform radio packets into events
-        events = pkt.toEvents()
-        for e in events:
+        for e in pkt.toEvents():
             # put events on outQueue
             outQueue.put(e)
 
